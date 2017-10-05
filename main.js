@@ -212,7 +212,7 @@ function resetWindow(){
     GPU.initTextureFromData("pressure",             width, height, "FLOAT", pressure);  GPU.initFrameBufferForTexture("pressure");
     GPU.initTextureFromData("nextPressure",         width, height, "FLOAT", pressure);  GPU.initFrameBufferForTexture("nextPressure");
 
-    let numCols = Math.floor(actualHeight / 10);
+    let numCols = Math.floor(actualHeight / 1);
     if (numCols%2 === 1) numCols--;
     const numPx = actualHeight / numCols;
 

@@ -23,6 +23,8 @@
 
             vec2 dir = fragCoord - 3.0 * vec2(0.5, 0.5) - u_obstaclePosition; // not sure where this fac of 3 came from?
             float dist = length(dir);
+            // if      (fragCoord.y <= (1.0 / u_textureSize.y))      {gl_FragColor = vec4(0);}
+            // else if (fragCoord.y >= (u_textureSize.y - 1.0))      {gl_FragColor = vec4(0);}
             if      (dist < u_obstacleRad)      {gl_FragColor = vec4(0);}
             else if (dist < u_obstacleRad + 1.0){gl_FragColor = texture2D(u_texture, (fragCoord + dir / dist * 2.0) / u_textureSize) * u_scale;}
             else                                {gl_FragColor = texture2D(u_texture, fragCoord                      / u_textureSize);}

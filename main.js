@@ -6,17 +6,18 @@
 let width, height;
 let actualWidth, actualHeight;
 let body;
-let scale = 3.5;
 
 let obstaclePosition    = [0,0];
-let obstacleRad         = 50;
+let obstacleRad         = 25;
 let movingObstacle      = false;
 
-let lastMouseCoordinates =  [0,0];
-let mouseCoordinates =  [0,0];
-let mouseEnable = false;
+let lastMouseCoordinates= [0,0];
+let mouseCoordinates    = [0,0];
+let mouseEnable         = false;
 
-let paused = false;//while window is resizing
+let paused = false; // while window is resizing
+
+const CanvasTexture = null; // if bindFrameBuffer = null, then outputs to HTML Canvas
 
 const dt = 1;
 const dx = 1;
@@ -47,37 +48,37 @@ function initGL() {
 
     // setup a GLSL programs
     GPU.createProgram("advectVel", "2d-vertex-shader", "advectShaderVel");
-    GPU.setUniformForProgram("advectVel", "u_dt", dt, "1f");
-    GPU.setUniformForProgram("advectVel", "u_velocity", 0, "1i");
-    GPU.setUniformForProgram("advectVel", "u_material", 1, "1i");
+    GPU.setUniformForProgram("advectVel", "u_dt",       dt, "1f");
+    GPU.setUniformForProgram("advectVel", "u_velocity", 0,  "1i");
+    GPU.setUniformForProgram("advectVel", "u_material", 1,  "1i");
 
     GPU.createProgram("advectMat", "2d-vertex-shader", "advectShaderMat");
-    GPU.setUniformForProgram("advectMat", "u_dt", dt, "1f");
-    GPU.setUniformForProgram("advectMat", "u_velocity", 0, "1i");
-    GPU.setUniformForProgram("advectMat", "u_material", 1, "1i");
+    GPU.setUniformForProgram("advectMat", "u_dt",       dt, "1f");
+    GPU.setUniformForProgram("advectMat", "u_velocity", 0,  "1i");
+    GPU.setUniformForProgram("advectMat", "u_material", 1,  "1i");
 
     GPU.createProgram("gradientSubtraction", "2d-vertex-shader", "gradientSubtractionShader");
-    GPU.setUniformForProgram("gradientSubtraction", "u_const", 0.5 / dx, "1f");//dt/(2*rho*dx)
-    GPU.setUniformForProgram("gradientSubtraction", "u_velocity", 0, "1i");
-    GPU.setUniformForProgram("gradientSubtraction", "u_pressure", 1, "1i");
+    GPU.setUniformForProgram("gradientSubtraction", "u_const",      0.5 / dx,   "1f"); //dt/(2*rho*dx)
+    GPU.setUniformForProgram("gradientSubtraction", "u_velocity",   0,          "1i");
+    GPU.setUniformForProgram("gradientSubtraction", "u_pressure",   1,          "1i");
 
     GPU.createProgram("diverge", "2d-vertex-shader", "divergenceShader");
-    GPU.setUniformForProgram("diverge", "u_const", 0.5 / dx, "1f");//-2*dx*rho/dt
-    GPU.setUniformForProgram("diverge", "u_velocity", 0, "1i");
+    GPU.setUniformForProgram("diverge", "u_const",      0.5 / dx,   "1f");//-2*dx*rho/dt
+    GPU.setUniformForProgram("diverge", "u_velocity",   0,          "1i");
 
     GPU.createProgram("force", "2d-vertex-shader", "forceShader");
-    GPU.setUniformForProgram("force", "u_dt", dt, "1f");
-    GPU.setUniformForProgram("force", "u_velocity", 0, "1i");
+    GPU.setUniformForProgram("force", "u_dt",           dt, "1f");
+    GPU.setUniformForProgram("force", "u_velocity",     0,  "1i");
 
     GPU.createProgram("jacobi", "2d-vertex-shader", "jacobiShader");
-    GPU.setUniformForProgram("jacobi", "u_b", 0, "1i");
-    GPU.setUniformForProgram("jacobi", "u_x", 1, "1i");
+    GPU.setUniformForProgram("jacobi", "u_b",           0, "1i");
+    GPU.setUniformForProgram("jacobi", "u_x",           1, "1i");
 
     GPU.createProgram("render", "2d-vertex-shader", "2d-render-shader");
-    GPU.setUniformForProgram("render", "u_material", 0, "1i");
+    GPU.setUniformForProgram("render", "u_material",    0, "1i");
 
     GPU.createProgram("boundary", "2d-vertex-shader", "boundaryConditionsShader");
-    GPU.setUniformForProgram("boundary", "u_texture", 0, "1i");
+    GPU.setUniformForProgram("boundary", "u_texture",   0, "1i");
 
     resetWindow();
 
@@ -99,7 +100,7 @@ function render(){
         //apply force
         if (mouseEnable){
             GPU.setUniformForProgram("force", "u_mouseCoord",   [mouseCoordinates[0] * width / actualWidth, mouseCoordinates[1] * height / actualHeight], "2f");
-            GPU.setUniformForProgram("force", "u_mouseDir",     [2 * (mouseCoordinates[0] - lastMouseCoordinates[0]) / scale, 2 * (mouseCoordinates[1] - lastMouseCoordinates[1]) / scale], "2f");
+            GPU.setUniformForProgram("force", "u_mouseDir",     [mouseCoordinates[0] - lastMouseCoordinates[0], mouseCoordinates[1] - lastMouseCoordinates[1]], "2f");
             GPU.step("force", ["velocity"], "nextVelocity");
 
             GPU.setUniformForProgram("boundary", "u_scale", -1, "1f");
@@ -112,7 +113,7 @@ function render(){
         // <-- Diffuse velocity
         GPU.setUniformForProgram("jacobi", "u_alpha", -dx*dx, "1f");
         GPU.setUniformForProgram("jacobi", "u_reciprocalBeta", 1/4, "1f");
-        for (let i = 0; i < 20; i++){
+        for (let i = 0; i < 2; i++){
             GPU.step("jacobi", ["velocityDivergence", "pressure"],      "nextPressure");
             GPU.step("jacobi", ["velocityDivergence", "nextPressure"],  "pressure");
         }
@@ -132,35 +133,41 @@ function render(){
         GPU.setSize(actualWidth, actualHeight);
         GPU.step("advectMat", ["velocity", "material"], "nextMaterial");
 
-        // GPU.setUniformForProgram("render" ,"u_obstaclePosition", [obstaclePosition[0], obstaclePosition[1]], "2f");
-        GPU.step("render", ["nextMaterial"]);
-        // GPU.step("render", ["velocity"]);
-        // GPU.step("render", ["pressure"]);
-        // GPU.step("render", ["velocityDivergence"]);
+        GPU.setUniformForProgram("render" ,"u_obstaclePosition", [obstaclePosition[0], obstaclePosition[1]], "2f");
+        const scalerP = document.getElementById("scalerP").value;
+        const scalerD = document.getElementById("scalerD").value;
+        switch (document.querySelector('input[name="visualisation"]:checked').value){
+            case "divergence"   :   GPU.setUniformForProgram("render" ,"u_colourScaler",     scalerD, "1f");      GPU.step("render", ["velocityDivergence"],CanvasTexture);         break;
+            case "material"     :   GPU.setUniformForProgram("render" ,"u_colourScaler",     1.0, "1f");          GPU.step("render", ["nextMaterial"],      CanvasTexture);         break;
+            case "velocity"     :   GPU.setUniformForProgram("render" ,"u_colourScaler",     1.0, "1f");          GPU.step("render", ["velocity"],          CanvasTexture);         break;
+            case "pressure"     :   GPU.setUniformForProgram("render" ,"u_colourScaler",     scalerP, "1f");      GPU.step("render", ["pressure"],          CanvasTexture);         break;
+        }
+
         GPU.swapTextures("nextMaterial", "material");
 
-    } else resetWindow();
+    }
+    // else resetWindow();
 
     window.requestAnimationFrame(render);
 }
 
 function onResize(){
-    paused = true;
+    // paused = true;
 }
 
 function resetWindow(){
     // const canvas    = document.getElementById("glcanvas");
+    const display = document.getElementById("display");
 
-    actualWidth     = body.clientWidth;
-    actualHeight    = body.clientHeight;
+    actualWidth     = 1000;//body.clientWidth;
+    actualHeight    = 0.5 * actualWidth;
 
-    const maxDim    = Math.max(actualHeight, actualWidth);
-    const scale     = maxDim / 1000;
+    width   = actualWidth;//500;
+    height  = Math.floor(width * actualHeight / actualWidth);
+    obstaclePosition = [actualWidth * 0.25, actualHeight / 2];
 
-    width   = Math.floor(actualWidth / scale);
-    height  = Math.floor(actualHeight / scale);
-
-    obstaclePosition = [actualWidth / 3, actualHeight / 2];
+    display.innerHTML = "screen=" + actualWidth + " x " + actualHeight + " , mesh=" + width + " x " + height;
+    const scale     = actualWidth / width;
 
     canvas.width        = canvas.clientWidth = actualWidth;
     canvas.height       = canvas.clientHeight= actualHeight;
@@ -203,7 +210,7 @@ function resetWindow(){
     for (let i = 0; i < height; i++){
         for (let j = 0; j < width; j++){
             const index = 4 * (i * width + j);
-            velocity[index] = 1;
+            velocity[index] = 1.0; // in advectShaderVel on left edge BC
         }
     }
     GPU.initTextureFromData("velocity",             width, height, "FLOAT", velocity);  GPU.initFrameBufferForTexture("velocity");
@@ -212,19 +219,21 @@ function resetWindow(){
     GPU.initTextureFromData("pressure",             width, height, "FLOAT", pressure);  GPU.initFrameBufferForTexture("pressure");
     GPU.initTextureFromData("nextPressure",         width, height, "FLOAT", pressure);  GPU.initFrameBufferForTexture("nextPressure");
 
-    let numCols = Math.floor(actualHeight / 1);
+    let numCols = 100;
     if (numCols%2 === 1) numCols--;
     const numPx = actualHeight / numCols;
 
     const material = new Float32Array(actualWidth * actualHeight * 4);
     for (let i = 0; i < actualHeight; i++){
-        const index = 4 * i * actualWidth;
-        if (Math.floor((i - 2) / numPx)%2 === 0) material[index] = 1.0;
+        for (let j = 0; j < actualWidth; j++){
+            const index = 4 * (i * actualWidth + j);
+            if (Math.floor((i - 2) / numPx)%2 === 0) material[index] = 1.0;
+        }
     }
     GPU.initTextureFromData("material",     actualWidth, actualHeight, "FLOAT", material);  GPU.initFrameBufferForTexture("material");
     GPU.initTextureFromData("nextMaterial", actualWidth, actualHeight, "FLOAT", material);  GPU.initFrameBufferForTexture("nextMaterial");
 
-    paused = false;
+    // paused = false;
 }
 
 function onMouseMove(e){
